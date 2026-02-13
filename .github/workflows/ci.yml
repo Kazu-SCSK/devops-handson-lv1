@@ -2,37 +2,50 @@ name: Node.js CI/CD
 
 on:
   push:
-    branches: ["main"] # mainブランチへのpush時のみ実行
+    branches: ["**"]  # 変更点1: すべてのブランチで動くようにする
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
 jobs:
-  # 1. テストとビルド
+  # 1. テストとビルド (全ブランチで実行)
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with: { node-version: '18' }
-      - run: npm install
-      - run: npm run test
-      # Web公開用ファイルをアップロード準備
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+      - name: ソースコードの取得
+        uses: actions/checkout@v4
+      
+      - name: Node.jsのセットアップ
+        uses: actions/setup-node@v4
         with:
-          path: '.' # カレントディレクトリをアップロード
+          node-version: '18'
+          
+      - name: ライブラリのインストール
+        run: npm install
+        
+      - name: テストの実行
+        run: npm run test
+        
+      - name: GitHub Pages用ファイルのアップロード
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
 
-  # 2. デプロイ（ビルド成功時のみ動く）
+  # 2. デプロイ (mainブランチの時だけ実行)
   deploy:
     needs: build-and-test
+    if: github.ref == 'refs/heads/main'  # 変更点2: main以外ではスキップする
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to GitHub Pages
+      - name: GitHub Pagesへデプロイ
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
